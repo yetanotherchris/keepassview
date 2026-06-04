@@ -1,0 +1,332 @@
+'use strict';
+
+const CONFIG = {"idleTimeoutSeconds": {{.IdleTimeoutSeconds}}};
+
+// ── State ────────────────────────────────────────────────────────────────────
+let allGroups   = [];
+let activeGroup = '';   // group uuid, '' = all
+let activeEntry = '';   // entry uuid
+let searchTimer = null;
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('quit-btn').addEventListener('click', quit);
+  document.getElementById('search').addEventListener('input', onSearchInput);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') quit();
+  });
+  await loadGroupsAndEntries();
+});
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+async function apiFetch(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`${path}: ${res.status}`);
+  return res.json();
+}
+
+// ── Data loading ──────────────────────────────────────────────────────────────
+async function loadGroupsAndEntries() {
+  try {
+    allGroups = await apiFetch('/api/groups');
+    renderGroups();
+    await loadEntries();
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+async function loadEntries() {
+  const q     = document.getElementById('search').value;
+  const url   = '/api/search?' + new URLSearchParams({ q, group: activeGroup });
+  try {
+    const entries = await apiFetch(url);
+    renderEntries(entries);
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+function onSearchInput() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(loadEntries, 220);
+}
+
+// ── Quit ──────────────────────────────────────────────────────────────────────
+async function quit() {
+  try { await fetch('/api/quit', { method: 'POST' }); } catch (_) {}
+  window.close();
+  document.body.innerHTML = '<p style="padding:2rem;color:#888;font-family:sans-serif">Shutting down…</p>';
+}
+
+// ── Render: groups ────────────────────────────────────────────────────────────
+function renderGroups() {
+  const tree = document.getElementById('groups-tree');
+  tree.innerHTML = '';
+
+  // "All Entries" pseudo-group
+  tree.appendChild(makeGroupItem({ uuid: '', name: 'All Entries', count: totalCount(allGroups), children: [] }));
+
+  for (const g of allGroups) {
+    tree.appendChild(renderGroupNode(g));
+  }
+}
+
+function totalCount(groups) {
+  return groups.reduce((n, g) => n + g.count, 0);
+}
+
+function renderGroupNode(g) {
+  const wrap = document.createElement('div');
+  const item = makeGroupItem(g);
+  wrap.appendChild(item);
+  if (g.children && g.children.length > 0) {
+    const sub = document.createElement('div');
+    sub.className = 'group-children';
+    for (const child of g.children) sub.appendChild(renderGroupNode(child));
+    wrap.appendChild(sub);
+  }
+  return wrap;
+}
+
+function makeGroupItem(g) {
+  const el = document.createElement('div');
+  el.className = 'group-item' + (g.uuid === activeGroup ? ' active' : '');
+  el.dataset.uuid = g.uuid;
+  el.innerHTML = `
+    <span class="group-icon">📁</span>
+    <span class="group-name">${esc(g.name)}</span>
+    <span class="group-count">${g.count}</span>`;
+  el.addEventListener('click', () => selectGroup(g.uuid));
+  return el;
+}
+
+async function selectGroup(uuid) {
+  activeGroup = uuid;
+  activeEntry = '';
+  clearDetail();
+  document.querySelectorAll('.group-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.uuid === uuid);
+  });
+  await loadEntries();
+}
+
+// ── Render: entry list ────────────────────────────────────────────────────────
+function renderEntries(entries) {
+  const pane  = document.getElementById('entries-pane');
+  const empty = document.getElementById('entries-empty');
+
+  // Remove old entry items
+  pane.querySelectorAll('.entry-item').forEach(el => el.remove());
+
+  if (!entries || entries.length === 0) {
+    empty.textContent = 'No entries found.';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  for (const e of entries) {
+    const el = document.createElement('div');
+    el.className = 'entry-item' + (e.uuid === activeEntry ? ' active' : '');
+    el.dataset.uuid = e.uuid;
+    el.innerHTML = `
+      <div class="entry-title">${esc(e.title || '(no title)')}</div>
+      <div class="entry-username">${esc(e.username || '')}</div>`;
+    el.addEventListener('click', () => selectEntry(e.uuid));
+    pane.appendChild(el);
+  }
+}
+
+// ── Render: entry detail ──────────────────────────────────────────────────────
+async function selectEntry(uuid) {
+  activeEntry = uuid;
+  document.querySelectorAll('.entry-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.uuid === uuid);
+  });
+
+  const pane = document.getElementById('detail-pane');
+  pane.className = 'detail-pane';
+  pane.innerHTML = '<div class="empty-state">Loading…</div>';
+
+  try {
+    const detail = await apiFetch('/api/entries/' + uuid);
+    renderDetail(detail);
+  } catch (err) {
+    pane.innerHTML = `<div class="empty-state">Error: ${esc(err.message)}</div>`;
+  }
+}
+
+function renderDetail(d) {
+  const pane = document.getElementById('detail-pane');
+  pane.className = 'detail-pane';
+  pane.innerHTML = '';
+
+  const title = document.createElement('div');
+  title.className = 'detail-title';
+  title.textContent = d.title || '(no title)';
+  pane.appendChild(title);
+
+  if (d.username) appendField(pane, 'Username', d.username, false);
+  appendPasswordField(pane, d.password || '');
+  if (d.url)      appendField(pane, 'URL', d.url, false, true);
+  if (d.notes)    appendField(pane, 'Notes', d.notes, false);
+
+  if (d.customFields && d.customFields.length > 0) {
+    const hr = document.createElement('hr');
+    hr.className = 'detail-divider';
+    pane.appendChild(hr);
+    for (const f of d.customFields) {
+      appendField(pane, f.key, f.value, false);
+    }
+  }
+
+  if (d.attachments && d.attachments.length > 0) {
+    const hr = document.createElement('hr');
+    hr.className = 'detail-divider';
+    pane.appendChild(hr);
+    const label = document.createElement('div');
+    label.className = 'detail-label';
+    label.textContent = 'Attachments';
+    pane.appendChild(label);
+    for (const a of d.attachments) {
+      const row = document.createElement('div');
+      row.style.cssText = 'font-size:12px;color:var(--text-muted);padding:2px 0';
+      row.textContent = a.name + (a.size > 0 ? ` (${humanSize(a.size)})` : '');
+      pane.appendChild(row);
+    }
+  }
+
+  if (d.created || d.modified) {
+    const hr = document.createElement('hr');
+    hr.className = 'detail-divider';
+    pane.appendChild(hr);
+    const meta = document.createElement('div');
+    meta.className = 'meta-row';
+    if (d.modified) meta.innerHTML += `<span>Modified: ${fmtDate(d.modified)}</span>`;
+    if (d.created)  meta.innerHTML += `<span>Created: ${fmtDate(d.created)}</span>`;
+    pane.appendChild(meta);
+  }
+}
+
+function appendField(pane, label, value, secret, isURL) {
+  const sec = document.createElement('div');
+  sec.className = 'detail-section';
+
+  const lbl = document.createElement('div');
+  lbl.className = 'detail-label';
+  lbl.textContent = label;
+  sec.appendChild(lbl);
+
+  const row = document.createElement('div');
+  row.className = 'detail-value-row';
+
+  const val = document.createElement('div');
+  val.className = 'detail-value';
+  if (isURL && value) {
+    const a = document.createElement('a');
+    a.href = value;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = value;
+    val.appendChild(a);
+  } else {
+    val.textContent = value;
+  }
+  row.appendChild(val);
+
+  row.appendChild(makeCopyBtn(value));
+  sec.appendChild(row);
+  pane.appendChild(sec);
+}
+
+function appendPasswordField(pane, password) {
+  const sec = document.createElement('div');
+  sec.className = 'detail-section';
+
+  const lbl = document.createElement('div');
+  lbl.className = 'detail-label';
+  lbl.textContent = 'Password';
+  sec.appendChild(lbl);
+
+  const row = document.createElement('div');
+  row.className = 'detail-value-row';
+
+  const val = document.createElement('div');
+  val.className = 'detail-value';
+  let revealed = false;
+
+  function refresh() {
+    val.innerHTML = revealed
+      ? esc(password)
+      : '<span class="password-mask">••••••••</span>';
+    eyeBtn.textContent = revealed ? '🙈' : '👁';
+    eyeBtn.title = revealed ? 'Hide password' : 'Reveal password';
+  }
+
+  const eyeBtn = document.createElement('button');
+  eyeBtn.className = 'btn-eye';
+  eyeBtn.addEventListener('click', () => { revealed = !revealed; refresh(); });
+
+  refresh();
+  row.appendChild(val);
+  row.appendChild(eyeBtn);
+  row.appendChild(makeCopyBtn(password));
+  sec.appendChild(row);
+  pane.appendChild(sec);
+}
+
+function makeCopyBtn(text) {
+  const btn = document.createElement('button');
+  btn.className = 'btn-copy';
+  btn.textContent = 'Copy';
+  btn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+        // Auto-clear clipboard after 30 s
+        navigator.clipboard.readText().then(t => {
+          if (t === text) navigator.clipboard.writeText('');
+        }).catch(() => {});
+      }, 30000);
+    } catch (_) {
+      btn.textContent = 'Error';
+    }
+  });
+  return btn;
+}
+
+function clearDetail() {
+  const pane = document.getElementById('detail-pane');
+  pane.className = 'detail-pane empty';
+  pane.innerHTML = '<span>Select an entry</span>';
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function fmtDate(iso) {
+  try { return new Date(iso).toLocaleString(); } catch (_) { return iso; }
+}
+
+function humanSize(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1048576).toFixed(1) + ' MB';
+}
+
+function showError(msg) {
+  const empty = document.getElementById('entries-empty');
+  if (empty) { empty.textContent = 'Error: ' + msg; empty.style.display = ''; }
+}

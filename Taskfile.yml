@@ -1,0 +1,35 @@
+version: '3'
+
+vars:
+  TAILWIND_BIN:
+    sh: |
+      if [ "$(go env GOOS)" = "windows" ]; then echo "build/tailwindcss.exe"; else echo "build/tailwindcss"; fi
+
+tasks:
+  css:
+    desc: "Compile Tailwind CSS (requires build/tailwindcss standalone binary)"
+    cmds:
+      - '{{.TAILWIND_BIN}} -i assets/input.css -o assets/static/app.css --minify'
+
+  build:
+    desc: "Build the keepassview binary"
+    deps: [css]
+    cmds:
+      - go build -o keepassview{{exeExt}} .
+    generates:
+      - keepassview{{exeExt}}
+
+  build-no-css:
+    desc: "Build without regenerating CSS (use existing assets/static/app.css)"
+    cmds:
+      - go build -o keepassview{{exeExt}} .
+
+  vet:
+    desc: "Run go vet"
+    cmds:
+      - go vet ./...
+
+  tidy:
+    desc: "Tidy go module"
+    cmds:
+      - go mod tidy
