@@ -1,6 +1,6 @@
 # keepassview
 
-A read-only KeePass (.kdbx) database viewer that runs a local web server and opens the vault in your browser.
+A read-only KeePass (.kdbx) database viewer that runs a local web server and opens the vault in your browser. It does not edit, create, or write to the database in any way.
 
 ## Build
 

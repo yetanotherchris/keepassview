@@ -13,6 +13,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /{$}", s.handleIndex)
 	mux.HandleFunc("GET /app.js", s.handleAppJS)
 	mux.HandleFunc("GET /app.css", s.handleAppCSS)
+	mux.HandleFunc("GET /ping", s.handlePing)
 	mux.HandleFunc("GET /api/groups", s.apiGroups)
 	mux.HandleFunc("GET /api/search", s.apiSearch)
 	mux.HandleFunc("GET /api/entries/{uuid}", s.apiEntry)
@@ -109,6 +110,10 @@ func (s *Server) apiEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, detail)
+}
+
+func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) apiQuit(w http.ResponseWriter, r *http.Request) {

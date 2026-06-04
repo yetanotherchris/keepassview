@@ -331,6 +331,34 @@ function showError(msg) {
   if (empty) { empty.textContent = 'Error: ' + msg; empty.style.display = ''; }
 }
 
+// ── Server liveness poll ─────────────────────────────────────────────────────
+(function () {
+  let gone = false;
+  const id = setInterval(async function () {
+    if (gone) return;
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 2000);
+      const r = await fetch('/ping', { signal: ctrl.signal });
+      clearTimeout(t);
+      if (!r.ok) showTimeout();
+    } catch (_) {
+      showTimeout();
+    }
+  }, 1000);
+
+  function showTimeout() {
+    if (gone) return;
+    gone = true;
+    clearInterval(id);
+    document.body.innerHTML =
+      '<div class="timeout-screen">' +
+        '<strong>Session ended</strong>' +
+        '<span>Inactivity timeout — close this tab</span>' +
+      '</div>';
+  }
+}());
+
 // ── Detail pane resize ───────────────────────────────────────────────────────
 (function () {
   const handle = document.getElementById('detail-resize');
