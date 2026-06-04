@@ -12,6 +12,20 @@ cd keepassview
 go build -o keepassview .
 ```
 
+### Using Task
+
+If you have [Task](https://taskfile.dev) installed:
+
+| Command | Description |
+|---|---|
+| `task build` | Compile Tailwind CSS then build the binary |
+| `task build-no-css` | Build without regenerating CSS |
+| `task css` | Regenerate CSS only (requires `build/tailwindcss` standalone binary) |
+| `task vet` | Run `go vet` |
+| `task tidy` | Run `go mod tidy` |
+
+`task build` depends on the [Tailwind CSS standalone CLI](https://tailwindcss.com/blog/standalone-cli) placed at `build/tailwindcss` (or `build/tailwindcss.exe` on Windows). Use `task build-no-css` to skip that step if the CSS is already up to date.
+
 ## Setup
 
 Run once to configure the database path, password mode, and idle timeout:
