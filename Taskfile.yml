@@ -1,6 +1,8 @@
 version: '3'
 
 vars:
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
   TAILWIND_BIN:
     sh: |
       if [ "$(go env GOOS)" = "windows" ]; then echo "build/tailwindcss.exe"; else echo "build/tailwindcss"; fi
@@ -15,14 +17,14 @@ tasks:
     desc: "Build the keepassview binary"
     deps: [css]
     cmds:
-      - go build -o keepassview{{exeExt}} .
+      - go build -ldflags="-X main.version={{.VERSION}}" -o keepassview{{exeExt}} .
     generates:
       - keepassview{{exeExt}}
 
   build-no-css:
     desc: "Build without regenerating CSS (use existing assets/static/app.css)"
     cmds:
-      - go build -o keepassview{{exeExt}} .
+      - go build -ldflags="-X main.version={{.VERSION}}" -o keepassview{{exeExt}} .
 
   vet:
     desc: "Run go vet"
