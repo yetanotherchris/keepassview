@@ -20,12 +20,13 @@ type Group struct {
 
 // EntrySummary is a lightweight entry representation for list views.
 type EntrySummary struct {
-	UUID     string `json:"uuid"`
-	Title    string `json:"title"`
-	Username string `json:"username"`
-	URL      string `json:"url"`
-	Group    string `json:"group"`
-	Icon     int    `json:"icon"`
+	UUID       string `json:"uuid"`
+	Title      string `json:"title"`
+	Username   string `json:"username"`
+	URL        string `json:"url"`
+	Group      string `json:"group"`
+	Icon       int    `json:"icon"`
+	CustomIcon string `json:"customIcon,omitempty"`
 }
 
 // CustomField is a non-standard entry field.
@@ -107,6 +108,18 @@ func uuidToString(u gokeepasslib.UUID) string {
 	return base64.RawURLEncoding.EncodeToString(u[:])
 }
 
+func (v *Vault) customIconData(u gokeepasslib.UUID) string {
+	if v.db.Content == nil || v.db.Content.Meta == nil {
+		return ""
+	}
+	for _, ci := range v.db.Content.Meta.CustomIcons {
+		if ci.UUID == u {
+			return ci.Data
+		}
+	}
+	return ""
+}
+
 func (v *Vault) processGroup(g gokeepasslib.Group) (Group, []string) {
 	groupUUID := uuidToString(g.UUID)
 	var allUUIDs []string
@@ -114,12 +127,13 @@ func (v *Vault) processGroup(g gokeepasslib.Group) (Group, []string) {
 	for _, entry := range g.Entries {
 		uuid := uuidToString(entry.UUID)
 		sum := EntrySummary{
-			UUID:     uuid,
-			Title:    entry.GetTitle(),
-			Username: entry.GetContent("UserName"),
-			URL:      entry.GetContent("URL"),
-			Group:    g.Name,
-			Icon:     int(entry.IconID),
+			UUID:       uuid,
+			Title:      entry.GetTitle(),
+			Username:   entry.GetContent("UserName"),
+			URL:        entry.GetContent("URL"),
+			Group:      g.Name,
+			Icon:       int(entry.IconID),
+			CustomIcon: v.customIconData(entry.CustomIconUUID),
 		}
 		v.summaries = append(v.summaries, sum)
 		v.summaryByUUID[uuid] = sum

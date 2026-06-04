@@ -131,9 +131,15 @@ function renderEntries(entries) {
     const el = document.createElement('div');
     el.className = 'entry-item' + (e.uuid === activeEntry ? ' active' : '');
     el.dataset.uuid = e.uuid;
+    const iconHtml = e.customIcon
+      ? `<img class="entry-icon" src="data:image/png;base64,${e.customIcon}" alt="">`
+      : `<div class="entry-icon entry-icon-placeholder"></div>`;
     el.innerHTML = `
-      <div class="entry-title">${esc(e.title || '(no title)')}</div>
-      <div class="entry-username">${esc(e.username || '')}</div>`;
+      ${iconHtml}
+      <div class="entry-text">
+        <div class="entry-title">${esc(e.title || '(no title)')}</div>
+        <div class="entry-username">${esc(e.username || '')}</div>
+      </div>`;
     el.addEventListener('click', () => selectEntry(e.uuid));
     pane.appendChild(el);
   }
