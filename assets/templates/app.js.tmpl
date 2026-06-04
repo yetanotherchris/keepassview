@@ -171,7 +171,7 @@ function renderDetail(d) {
   if (d.username) appendField(pane, 'Username', d.username, false);
   appendPasswordField(pane, d.password || '');
   if (d.url)      appendField(pane, 'URL', d.url, false, true);
-  if (d.notes)    appendField(pane, 'Notes', d.notes, false);
+  if (d.notes)    appendField(pane, 'Notes', d.notes, false, false, true);
 
   if (d.customFields && d.customFields.length > 0) {
     const hr = document.createElement('hr');
@@ -210,7 +210,7 @@ function renderDetail(d) {
   }
 }
 
-function appendField(pane, label, value, secret, isURL) {
+function appendField(pane, label, value, secret, isURL, multiline) {
   const sec = document.createElement('div');
   sec.className = 'detail-section';
 
@@ -220,10 +220,10 @@ function appendField(pane, label, value, secret, isURL) {
   sec.appendChild(lbl);
 
   const row = document.createElement('div');
-  row.className = 'detail-value-row';
+  row.className = 'detail-value-row' + (multiline ? ' notes-row' : '');
 
   const val = document.createElement('div');
-  val.className = 'detail-value';
+  val.className = 'detail-value' + (multiline ? ' multiline' : '');
   if (isURL && value) {
     const a = document.createElement('a');
     a.href = value;
@@ -330,3 +330,28 @@ function showError(msg) {
   const empty = document.getElementById('entries-empty');
   if (empty) { empty.textContent = 'Error: ' + msg; empty.style.display = ''; }
 }
+
+// ── Detail pane resize ───────────────────────────────────────────────────────
+(function () {
+  const handle = document.getElementById('detail-resize');
+  const pane   = document.getElementById('detail-pane');
+  if (!handle || !pane) return;
+  let startX, startW;
+  handle.addEventListener('mousedown', function (e) {
+    startX = e.clientX;
+    startW = pane.offsetWidth;
+    handle.classList.add('dragging');
+    function onMove(e) {
+      const w = Math.max(200, startW + (startX - e.clientX));
+      pane.style.width = w + 'px';
+    }
+    function onUp() {
+      handle.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    e.preventDefault();
+  });
+}());
