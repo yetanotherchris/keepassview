@@ -2,8 +2,8 @@ package server
 
 import (
 	"context"
-	"embed"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
@@ -21,7 +21,7 @@ import (
 type Server struct {
 	vault        *vault.Vault
 	cfg          *config.Config
-	assets       embed.FS
+	assets       fs.FS
 	lastActivity atomic.Int64
 	shutdownOnce sync.Once
 	shutdownCh   chan struct{}
@@ -41,13 +41,10 @@ func (s *Server) triggerShutdown() {
 	})
 }
 
-// Run starts the HTTP server and blocks until it shuts down.
-func Run(v *vault.Vault, cfg *config.Config, port int, assets embed.FS) error {
-	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
-	if err != nil {
-		return fmt.Errorf("listen: %w", err)
-	}
-
+// NewMux builds the HTTP handler for the given vault and config.
+// assets is any fs.FS rooted so that "assets/templates/…" and "assets/static/…"
+// paths resolve correctly (embed.FS from main, or os.DirFS for tests).
+func NewMux(v *vault.Vault, cfg *config.Config, assets fs.FS) (http.Handler, *Server) {
 	s := &Server{
 		vault:      v,
 		cfg:        cfg,
@@ -55,9 +52,19 @@ func Run(v *vault.Vault, cfg *config.Config, port int, assets embed.FS) error {
 		shutdownCh: make(chan struct{}),
 	}
 	s.touchActivity()
-
 	mux := http.NewServeMux()
 	s.registerRoutes(mux)
+	return mux, s
+}
+
+// Run starts the HTTP server and blocks until it shuts down.
+func Run(v *vault.Vault, cfg *config.Config, port int, assets fs.FS) error {
+	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	if err != nil {
+		return fmt.Errorf("listen: %w", err)
+	}
+
+	mux, s := NewMux(v, cfg, assets)
 	s.httpServer = &http.Server{Handler: mux}
 
 	// SIGINT / SIGTERM → graceful shutdown.
