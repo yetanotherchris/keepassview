@@ -159,9 +159,29 @@ body {
   cursor: pointer;
   border-bottom: 1px solid var(--border);
   transition: background 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .entry-item:hover { background: var(--bg-hover); }
 .entry-item.active { background: var(--bg-active); }
+
+.entry-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  object-fit: contain;
+}
+.entry-icon-placeholder {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.entry-text {
+  min-width: 0;
+  flex: 1;
+}
 
 .entry-title {
   font-weight: 500;
