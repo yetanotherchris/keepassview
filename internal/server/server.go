@@ -100,7 +100,7 @@ func Run(v *vault.Vault, cfg *config.Config, port int, assets fs.FS) error {
 	}()
 
 	addr := ln.Addr().String()
-	fmt.Printf("\nkeepassview is running at http://%s\n", addr)
+	fmt.Printf("\nkeepassview is running at \033[1;96mhttp://%s\033[0m\n", addr)
 	fmt.Println("Open the URL in your browser. Press Ctrl-C or click Quit to exit.")
 	fmt.Printf("Auto-shutdown after %d s of inactivity.\n\n", cfg.IdleTimeoutSeconds)
 
