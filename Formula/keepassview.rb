@@ -1,7 +1,7 @@
 class Keepassview < Formula
   desc "Read-only KeePass (.kdbx) database viewer that runs a local web server"
   homepage "https://github.com/yetanotherchris/keepassview"
-  1.0.0 "1.0.0"
+  version "1.0.0"
 
   on_macos do
     if Hardware::CPU.arm?
@@ -31,6 +31,6 @@ class Keepassview < Formula
   end
 
   test do
-    assert_match "keepassview 1.0.0", shell_output("#{bin}/keepassview --1.0.0")
+    assert_match "keepassview 1.0.0", shell_output("#{bin}/keepassview --version")
   end
 end

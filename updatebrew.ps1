@@ -5,13 +5,13 @@ param(
 
 $repo = "yetanotherchris/keepassview"
 $platforms = @("darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64")
+$templatePath = "$PSScriptRoot/Formula/keepassview.rb.tmpl"
 $formulaPath = "$PSScriptRoot/Formula/keepassview.rb"
 
-# Read the template
-$formula = Get-Content -Path $formulaPath -Raw
+# Always regenerate from the template so placeholders are never exhausted
+$formula = Get-Content -Path $templatePath -Raw
 
-# Replace VERSION placeholders
-$formula = $formula -replace 'VERSION', $Version
+$formula = $formula -replace '\{\{VERSION\}\}', $Version
 
 foreach ($platform in $platforms) {
     $url = "https://github.com/$repo/releases/download/v$Version/keepassview-$platform.tar.gz"
@@ -25,8 +25,8 @@ foreach ($platform in $platforms) {
 
     Remove-Item $tempFile
 
-    # Replace the SHA256 placeholder for this platform
-    $formula = $formula -replace "(?<=keepassview-$platform\.tar\.gz`"`n\s+sha256 `")SHA256", $hash
+    $placeholderKey = $platform.ToUpper() -replace '-', '_'
+    $formula = $formula -replace "\{\{SHA256_$placeholderKey\}\}", $hash
 }
 
 Set-Content -Path $formulaPath -Value $formula -NoNewline
