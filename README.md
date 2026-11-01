@@ -46,7 +46,7 @@ The server shuts itself down after a configurable period of inactivity (default 
 
 ## Building from Source
 
-Requires Go 1.25+.
+Requires Go 1.27+.
 
 ```bash
 git clone https://github.com/yetanotherchris/keepassview
